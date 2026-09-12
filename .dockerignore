@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+
+.git/
+.gitignore
+
+*.user
+*.suo
+*.db
+*.sqlite
+*.sqlite3
+
+Server/wwwroot/uploads/*

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Dashboard</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css"/>
+  <script src="js/config.js" defer></script>
+  <script src="js/signalr.min.js" defer></script>
+  <script src="js/authService.js" defer></script>
+  <script src="js/userService.js" defer></script>
+  <script src="js/groupService.js" defer></script>
+  <script src="js/chatService.js" defer></script>
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <div class="header">
+    <span id="currentUser" style="font-size: 1.2rem;">User: </span>
+    <button id="logoutBtn" class="btn">Logout</button>
+  </div>
+  <div class="container">
+    <div class="sidebar">
+      <div class="section">
+        <button class="toggle-btn" data-target="usersSection">Users</button>
+        <ul id="usersSection" class="list"></ul>
+      </div>
+      <div class="section">
+        <button class="toggle-btn" data-target="groupsSection">Groups</button>
+        <ul id="groupsSection" class="list"></ul>
+        <div id="noGroupsMessage" class="hidden">You are not a member of any groups.</div>
+        <button id="createGroupBtn" class="create-btn">Create Group</button>
+      </div>
+    </div>
+    <div class="chat-area">
+      <div class="header">
+        <span id="chatHeader">Select a user or group</span>
+        <button id="toggleGroupSettingsBtn" class="btn hidden">Group Settings ⚙️</button>
+      </div>
+      <div id="groupActions" class="group-actions hidden">
+        <h4>Group Members</h4>
+        <ul id="memberList" class="list"></ul>
+        <div id="addMemberSection">
+          <select id="newMemberSelect">
+            <option disabled selected value="">Select a user</option>
+          </select>
+          <select id="newMemberRole">
+            <option value="2">Member</option>
+            <option value="1">Admin</option>
+          </select>
+          <button id="addMemberBtn" class="btn">Add</button>
+        </div>
+        <button id="leaveGroupBtn" class="btn leave-btn">Leave Group</button>
+      </div>
+      <ul id="chatMessages" class="messages"></ul>
+      <form id="chatForm" class="chat-form">
+        <input id="chatInput" placeholder="Type a message..." autocomplete="off"/>
+        <input type="file" id="fileInput" style="max-width: 200px;" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggleGroupSettingsBtn = document.getElementById('toggleGroupSettingsBtn');
+      const groupActions = document.getElementById('groupActions');
+      const usersSection = document.getElementById('usersSection');
+      const groupsSection = document.getElementById('groupsSection');
+
+      toggleGroupSettingsBtn?.addEventListener('click', () => {
+        groupActions.classList.toggle('hidden');
+      });
+
+      usersSection?.addEventListener('click', (e) => {
+        if(e.target.tagName === 'LI') {
+          toggleGroupSettingsBtn.classList.add('hidden');
+          groupActions.classList.add('hidden');
+        }
+      });
+
+      groupsSection?.addEventListener('click', (e) => {
+        if(e.target.tagName === 'LI') {
+          toggleGroupSettingsBtn.classList.remove('hidden');
+          groupActions.classList.add('hidden');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

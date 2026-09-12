@@ -1,11 +1,21 @@
-namespace Shared.Models;
-public class User
+using System.Text.Json.Serialization;
+
+namespace Shared.Models
 {
-    public int    Id           { get; set; }
-    public string Username     { get; set; } = null!;
-    public string Email        { get; set; } = null!;
-    public string PasswordHash { get; set; } = null!;
-    public bool   IsOnline     { get; set; }
-    public ICollection<Message> SentMessages   { get; set; } = new List<Message>();
-    public ICollection<Message> ReceivedMessages { get; set; } = new List<Message>();
+    public class User
+    {
+        public int Id { get; set; }
+        public string? UserName { get; set; }
+        public string? Email { get; set; }
+        public string? PasswordHash { get; set; }
+
+        [JsonIgnore]
+        public virtual ICollection<Message> SentMessages { get; set; } = new List<Message>();
+
+        [JsonIgnore]
+        public virtual ICollection<Message> ReceivedMessages { get; set; } = new List<Message>();
+
+        [JsonIgnore]
+        public virtual ICollection<GroupMember> GroupMembers { get; set; } = new List<GroupMember>();
+    }
 }

@@ -1,45 +1,107 @@
-using Microsoft.AspNetCore.SignalR;
+using System;
+using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Server.Data;
+using Shared.Models;
+using Shared.Models.DTOs;
 
 namespace Server.Hubs
 {
     public class ChatHub : Hub
     {
-        /// <summary>
-        /// ارسال پیام به همهٔ کلاینت‌ها
-        /// </summary>
-        public async Task SendMessage(string user, string message)
+        private readonly ChatDbContext _db;
+        
+        public ChatHub(ChatDbContext db) => _db = db;
+
+        public override async Task OnConnectedAsync()
         {
-            await Clients.All.SendAsync("ReceiveMessage", user, message);
+            var u = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(u))
+            {
+                var userId = int.Parse(u);
+                await Groups.AddToGroupAsync(Context.ConnectionId, $"user-{userId}");
+
+                var myGroups = await _db.GroupMembers
+                    .Where(gm => gm.UserId == userId)
+                    .Select(gm => gm.GroupId)
+                    .ToListAsync();
+
+                foreach (var gid in myGroups)
+                    await Groups.AddToGroupAsync(Context.ConnectionId, $"group-{gid}");
+            }
+            await base.OnConnectedAsync();
         }
 
-        /// <summary>
-        /// ملحق شدن به یک گروه
-        /// </summary>
-        public async Task JoinGroup(string groupName)
+        public async Task SendMessage(SendMessageDto dto)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
-            await Clients.Group(groupName)
-                         .SendAsync("GroupNotification", $"{Context.ConnectionId} به گروه '{groupName}' ملحق شد.");
+            var u = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(u)) return;
+
+            var senderId = int.Parse(u);
+            var senderUser = await _db.Users.FindAsync(senderId);
+
+            var msg = new Message
+            {
+                SenderId = senderId,
+                ReceiverId = dto.ReceiverId,
+                GroupId = dto.GroupId,
+                Content = dto.Content ?? string.Empty,
+                SentAt = DateTime.UtcNow,
+                IsRead = false
+            };
+
+            if (!string.IsNullOrEmpty(dto.FileUrl))
+            {
+                msg.Attachments.Add(new FileAttachment
+                {
+                    FileUrl = dto.FileUrl,
+                    FileName = dto.FileName!,
+                    ContentType = dto.ContentType!
+                });
+            }
+
+            _db.Messages.Add(msg);
+            await _db.SaveChangesAsync();
+
+            var outMsg = new
+            {
+                Id = msg.Id,
+                SenderId = senderId,
+                SenderUsername = senderUser?.UserName,
+                ReceiverId = dto.ReceiverId,
+                GroupId = dto.GroupId,
+                Content = dto.Content,
+                SentAt = msg.SentAt,
+                Attachments = msg.Attachments.Select(a => new { a.FileUrl, a.FileName, a.ContentType })
+            };
+
+            if (dto.ReceiverId.HasValue)
+            {
+                await Clients.Caller.SendAsync("ReceiveMessage", outMsg);
+                await Clients.Group($"user-{dto.ReceiverId.Value}").SendAsync("ReceiveMessage", outMsg);
+            }
+            else if (dto.GroupId.HasValue)
+            {
+                await Clients.Group($"group-{dto.GroupId.Value}").SendAsync("ReceiveGroupMessage", outMsg);
+            }
         }
 
-        /// <summary>
-        /// خروج از یک گروه
-        /// </summary>
-        public async Task LeaveGroup(string groupName)
+        public async Task JoinGroup(int groupId)
         {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
-            await Clients.Group(groupName)
-                         .SendAsync("GroupNotification", $"{Context.ConnectionId} از گروه '{groupName}' خارج شد.");
+            var u = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(u)) throw new HubException("Unauthorized");
+
+            var userId = int.Parse(u);
+            var gm = await _db.GroupMembers.FindAsync(groupId, userId);
+
+            if (gm == null) throw new HubException("Not a member.");
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"group-{groupId}");
         }
 
-        /// <summary>
-        /// ارسال پیام به اعضای یک گروه
-        /// </summary>
-        public async Task SendMessageToGroup(string groupName, string user, string message)
-        {
-            await Clients.Group(groupName)
-                         .SendAsync("ReceiveGroupMessage", user, message);
-        }
+        public Task LeaveGroup(int groupId) =>
+            Groups.RemoveFromGroupAsync(Context.ConnectionId, $"group-{groupId}");
     }
 }

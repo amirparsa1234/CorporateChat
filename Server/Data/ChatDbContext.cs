@@ -6,36 +6,37 @@ namespace Server.Data
     public class ChatDbContext : DbContext
     {
         public ChatDbContext(DbContextOptions<ChatDbContext> options)
-            : base(options)
-        {
-        }
+            : base(options) { }
 
-        public DbSet<User>           Users           { get; set; } = null!;
-        public DbSet<Message>        Messages        { get; set; } = null!;
-        public DbSet<Group>          Groups          { get; set; } = null!;
-        public DbSet<GroupMember>    GroupMembers    { get; set; } = null!;
+        public DbSet<User> Users { get; set; } = null!;
+        public DbSet<Message> Messages { get; set; } = null!;
+        public DbSet<Group> Groups { get; set; } = null!;
+        public DbSet<GroupMember> GroupMembers { get; set; } = null!;
         public DbSet<FileAttachment> FileAttachments { get; set; } = null!;
+        public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
-
-            
             modelBuilder.Entity<GroupMember>()
                 .HasKey(gm => new { gm.GroupId, gm.UserId });
 
-            // relationships
+            modelBuilder.Entity<GroupMember>()
+                .Property(gm => gm.Role)
+                .HasConversion<int>()
+                .HasDefaultValue(GroupRole.Member);
+
             modelBuilder.Entity<GroupMember>()
                 .HasOne(gm => gm.Group)
                 .WithMany(g => g.Members)
-                .HasForeignKey(gm => gm.GroupId);
+                .HasForeignKey(gm => gm.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<GroupMember>()
                 .HasOne(gm => gm.User)
-                .WithMany()
-                .HasForeignKey(gm => gm.UserId);
+                .WithMany(u => u.GroupMembers)
+                .HasForeignKey(gm => gm.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-            // cascade delete rules 
             modelBuilder.Entity<Message>()
                 .HasOne(m => m.Sender)
                 .WithMany(u => u.SentMessages)
@@ -47,6 +48,18 @@ namespace Server.Data
                 .WithMany(u => u.ReceivedMessages)
                 .HasForeignKey(m => m.ReceiverId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Message>()
+                .HasOne(m => m.Group)
+                .WithMany(g => g.Messages)
+                .HasForeignKey(m => m.GroupId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<FileAttachment>()
+                .HasOne(fa => fa.Message)
+                .WithMany(m => m.Attachments)
+                .HasForeignKey(fa => fa.MessageId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }
